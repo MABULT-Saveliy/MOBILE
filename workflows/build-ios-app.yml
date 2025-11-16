@@ -1,0 +1,72 @@
+name: Build iOS ASCII Camera
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Собрать .app для симулятора или .ipa для устройств'
+        required: false
+        default: simulator
+        type: choice
+        options:
+          - simulator
+          - ipa
+
+jobs:
+  build:
+    runs-on: macos-14
+
+    env:
+      FLUTTER_VERSION: "3.24.3"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+
+      - name: Flutter pub get
+        working-directory: mobile_app
+        run: flutter pub get
+
+      - name: Select build target
+        id: mode
+        run: |
+          if [[ "${{ github.event.inputs.target }}" == "ipa" ]]; then
+            echo "target=ipa" >> "$GITHUB_OUTPUT"
+          else
+            echo "target=simulator" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build for iOS Simulator (.app)
+        if: steps.mode.outputs.target == 'simulator'
+        working-directory: mobile_app
+        run: |
+          flutter build ios --simulator --no-codesign
+          pushd build/ios/iphonesimulator
+          zip -yr ascii_camera_simulator.app.zip Runner.app
+          popd
+
+      - name: Upload Simulator .app artifact
+        if: steps.mode.outputs.target == 'simulator'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ascii-camera-ios-app
+          path: mobile_app/build/ios/iphonesimulator/ascii_camera_simulator.app.zip
+
+      - name: Build iOS archive (.ipa)
+        if: steps.mode.outputs.target == 'ipa'
+        working-directory: mobile_app
+        run: |
+          flutter build ipa --no-codesign
+
+      - name: Upload .ipa artifact
+        if: steps.mode.outputs.target == 'ipa'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ascii-camera-ios-ipa
+          path: mobile_app/build/ios/ipa/*.ipa
