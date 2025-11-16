@@ -10,7 +10,6 @@ name: Build iOS ASCII Camera
              options:
                - "simulator"
                - "ipa"
-
      jobs:
        build:
          runs-on: macos-14
